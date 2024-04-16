@@ -45,10 +45,7 @@ dependencies {
     implementation("androidx.camera:camera-core:1.0.0-alpha05")
     implementation("org.pytorch:pytorch_android_lite:1.13.1")
     implementation("org.pytorch:pytorch_android_torchvision_lite:1.13.1")
-    implementation ("com.google.mlkit:object-detection:16.2.4")
-    implementation ("com.google.android.gms:play-services-vision:20.1.3")
-    implementation(libs.play.services.vision.common)
-    implementation(libs.play.services.mlkit.face.detection)
+    implementation("com.google.android.gms:play-services-vision:20.1.3")
 
 
     testImplementation(libs.junit)

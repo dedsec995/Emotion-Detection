@@ -3,6 +3,8 @@ package com.example.emotiondetection;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -12,6 +14,7 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
@@ -27,6 +30,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.example.emotiondetection.entity.SensorData;
@@ -43,6 +47,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -319,6 +324,7 @@ public class FirstFragment extends Fragment {
             public void onClick(View v) {
                 Toast.makeText(getContext(), "Opening Camera", Toast.LENGTH_SHORT).show();
                 Log.d("MyTag","Before Opening Activity");
+
                 Intent intent = new Intent(getActivity(), LiveEmotionRecognitionActivity.class);
                 startActivity(intent);
 
@@ -580,6 +586,13 @@ public class FirstFragment extends Fragment {
             if (extras != null) {
                 Bitmap imageBitmap = (Bitmap) extras.get("data");
                 saveImageToStorage(imageBitmap);
+                try {
+                    saveBitmap(getContext(),imageBitmap,Bitmap.CompressFormat.PNG, "image/png", "Demo");
+                    Toast.makeText(requireContext(), "Demo Saved!", Toast.LENGTH_SHORT).show();
+                } catch (IOException e) {
+                    Toast.makeText(requireContext(), "Demo not Saved!", Toast.LENGTH_SHORT).show();
+                    throw new RuntimeException(e);
+                }
                 Toast.makeText(requireContext(), "Image captured successfully and saved!", Toast.LENGTH_SHORT).show();
             }
         }
@@ -587,19 +600,59 @@ public class FirstFragment extends Fragment {
 
     private void saveImageToStorage(Bitmap bitmap) {
         String root = Environment.getExternalStorageDirectory().toString();
-        File myDir = new File(root + "/MyAppImages");
+        File myDir = new File(root + "/Pictures/Camera/");
         myDir.mkdirs();
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
         String fileName = "IMG_" + timeStamp + ".jpg";
         File file = new File(myDir, fileName);
-        Log.d("MyTag","Saved At" + myDir + "/" + fileName);
         try {
             FileOutputStream out = new FileOutputStream(file);
             bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out);
             out.flush();
             out.close();
+            Log.d("MyTag","Saved At " + myDir + "/" + fileName);
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    @NonNull
+    public Uri saveBitmap(@NonNull final Context context, @NonNull final Bitmap bitmap,
+                          @NonNull final Bitmap.CompressFormat format,
+                          @NonNull final String mimeType,
+                          @NonNull final String displayName) throws IOException {
+
+        final ContentValues values = new ContentValues();
+        values.put(MediaStore.MediaColumns.DISPLAY_NAME, displayName);
+        values.put(MediaStore.MediaColumns.MIME_TYPE, mimeType);
+        values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DCIM);
+
+        final ContentResolver resolver = context.getContentResolver();
+        Uri uri = null;
+
+        try {
+            final Uri contentUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+            uri = resolver.insert(contentUri, values);
+
+            if (uri == null)
+                throw new IOException("Failed to create new MediaStore record.");
+
+            try (final OutputStream stream = resolver.openOutputStream(uri)) {
+                if (stream == null)
+                    throw new IOException("Failed to open output stream.");
+
+                if (!bitmap.compress(format, 95, stream))
+                    throw new IOException("Failed to save bitmap.");
+            }
+
+            return uri;
+        }
+        catch (IOException e) {
+            if (uri != null) {
+                // Don't leave an orphan entry in the MediaStore
+                resolver.delete(uri, null, null);
+            }
+            throw e;
         }
     }
 
